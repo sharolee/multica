@@ -8,6 +8,14 @@ export type RuntimeMachineFilter = "all" | "online" | "issues";
 export interface RuntimeWorkloadSummary {
   runningCount: number;
   queuedCount: number;
+  /**
+   * IDs of the non-archived agents bound to this runtime. Optional: callers
+   * without the workspace agent cache omit it, and the machine aggregation
+   * then treats the runtime's own online status as authoritative. When
+   * present, a runtime with no bound agents must not prop up the machine's
+   * online state (SHAR-188 C6 ①).
+   */
+  agentIds?: readonly string[];
 }
 
 export interface RuntimeMachine {
@@ -227,16 +235,39 @@ function finalizeRuntimeMachine(
   const healthByRuntime = runtimes.map((runtime) =>
     deriveRuntimeHealth(runtime, options.now),
   );
-  const onlineCount = healthByRuntime.filter((h) => h === "online").length;
-  const issueCount = runtimes.length - onlineCount;
+  // SHAR-188 C6 ①: a runtime reporting online only counts toward the
+  // machine's online state when at least one agent is bound to it — a
+  // zero-binding runtime (e.g. a disabled CLI) must not make the machine
+  // look online. Applied only when the caller supplied the workload index;
+  // without it, binding is unknown and the runtime's own status stays
+  // authoritative.
+  const bindingKnown = options.workloadByRuntimeId != null;
+  const hasBoundAgents = (runtime: AgentRuntime): boolean =>
+    (options.workloadByRuntimeId?.get(runtime.id)?.agentIds?.length ?? 0) > 0;
+  const onlineCount = runtimes.filter(
+    (runtime, index) =>
+      healthByRuntime[index] === "online" &&
+      (!bindingKnown || hasBoundAgents(runtime)),
+  ).length;
+  // SHAR-188 C6 ②: exceptions are the runtimes in a non-online health
+  // state. The machine surfaces the WORST of them instead of letting the
+  // healthy majority mask a single broken runtime — "online" only when
+  // every runtime is healthy. Zero-binding online runtimes are idle, not
+  // broken, so they count as issues neither.
+  const exceptionHealths = healthByRuntime.filter(
+    (health) => health !== "online",
+  );
+  const issueCount = exceptionHealths.length;
   const health =
-    onlineCount > 0
-      ? "online"
-      : healthByRuntime.reduce<RuntimeHealth>(
+    exceptionHealths.length > 0
+      ? exceptionHealths.reduce<RuntimeHealth>(
           (worst, current) =>
             HEALTH_SEVERITY[current] > HEALTH_SEVERITY[worst] ? current : worst,
           "recently_lost",
-        );
+        )
+      : onlineCount > 0
+        ? "online"
+        : "offline";
   const workload = runtimes.reduce(
     (sum, runtime) => {
       const entry = options.workloadByRuntimeId?.get(runtime.id);

@@ -129,6 +129,57 @@ describe("runtime machine grouping", () => {
     expect(filterRuntimeMachines(machines, "", "issues")).toHaveLength(1);
   });
 
+  it("does not count a zero-binding online runtime as machine online (SHAR-188 C6 ①)", () => {
+    // A disabled CLI (e.g. Trae) still reports online but no agent is bound
+    // to it — it must not prop up the machine's online state.
+    const bound = makeRuntime({ id: "rt-bound", provider: "claude" });
+    const unbound = makeRuntime({ id: "rt-unbound", provider: "trae" });
+    const withBindings = buildRuntimeMachines([bound, unbound], {
+      now: NOW,
+      workloadByRuntimeId: new Map([
+        ["rt-bound", { runningCount: 0, queuedCount: 0, agentIds: ["agent-1"] }],
+      ]),
+    });
+    expect(withBindings[0]?.health).toBe("online");
+    expect(withBindings[0]?.onlineCount).toBe(1);
+    // Idle, not broken: the zero-binding runtime is not an issue either.
+    expect(withBindings[0]?.issueCount).toBe(0);
+
+    const onlyUnbound = buildRuntimeMachines([unbound], {
+      now: NOW,
+      workloadByRuntimeId: new Map(),
+    });
+    expect(onlyUnbound[0]?.health).toBe("offline");
+    expect(onlyUnbound[0]?.onlineCount).toBe(0);
+
+    // Without the workload index binding is unknown — the runtime's own
+    // status stays authoritative.
+    const withoutIndex = buildRuntimeMachines([unbound], { now: NOW });
+    expect(withoutIndex[0]?.health).toBe("online");
+  });
+
+  it("surfaces a single runtime exception instead of masking it with healthy runtimes (SHAR-188 C6 ②)", () => {
+    const machines = buildRuntimeMachines(
+      [
+        makeRuntime({ id: "rt-online-1", provider: "claude" }),
+        makeRuntime({ id: "rt-online-2", provider: "codex" }),
+        makeRuntime({
+          id: "rt-broken",
+          provider: "copilot",
+          status: "offline",
+          last_seen_at: new Date(NOW - 10 * 60_000).toISOString(),
+        }),
+      ],
+      { now: NOW },
+    );
+
+    // Old behavior let the two online runtimes report the machine as
+    // "online", drowning the one broken runtime.
+    expect(machines[0]?.health).toBe("offline");
+    expect(machines[0]?.issueCount).toBe(1);
+    expect(machines[0]?.onlineCount).toBe(2);
+  });
+
   it("keeps long_offline as the highest-severity machine health", () => {
     const machines = buildRuntimeMachines(
       [
