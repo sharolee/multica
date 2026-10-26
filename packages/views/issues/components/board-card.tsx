@@ -28,6 +28,7 @@ import type { ChildProgress } from "./list-row";
 import { IssueActionsContextMenu } from "../actions";
 import { LabelChip } from "../../labels/label-chip";
 import { IssueAgentActivityIndicator } from "./issue-agent-activity-indicator";
+import { IssueUsageBadge } from "./issue-usage-badge";
 import { CustomStatusChip, useIsCustomStatus } from "./custom-status-chip";
 import { IssueDuplicateOfMarker } from "./issue-duplicates";
 import { useIssueSurfaceActionsOptional } from "../surface/actions-context";
@@ -114,6 +115,7 @@ export const BoardCardContent = memo(function BoardCardContent({
     storeProperties.project && cardGrouping !== "project" && project;
   const showChildProgress = storeProperties.childProgress && childProgress;
   const showLabels = storeProperties.labels && labels.length > 0;
+  const showUsage = storeProperties.usage;
   // Keeps the chip row from rendering an empty flex container when the status
   // chip is the only thing in it and it decides to render nothing.
   const showCustomStatus = useIsCustomStatus(issue.status);
@@ -193,8 +195,8 @@ export const BoardCardContent = memo(function BoardCardContent({
     )
   ) : null;
 
-  const showMetaRow = showAssigneeSection || showStartDate || showDueDate || showChildProgress;
-  const showRightMeta = !!showStartDate || !!showDueDate || !!showChildProgress || showUpdatedHint;
+  const showMetaRow = showAssigneeSection || showStartDate || showDueDate || showChildProgress || showUsage;
+  const showRightMeta = !!showStartDate || !!showDueDate || !!showChildProgress || showUpdatedHint || showUsage;
 
   return (
     <div className="rounded-lg border-[0.5px] border-surface-border bg-surface py-3 px-2.5 shadow-[var(--surface-shadow)] transition-colors group-hover/card:border-foreground/15 group-hover/card:bg-surface-hover group-data-[popup-open]/card:border-foreground/15 group-data-[popup-open]/card:bg-surface-hover group-data-[peeked]/card:ring-2 group-data-[peeked]/card:ring-brand/50">
@@ -326,6 +328,9 @@ export const BoardCardContent = memo(function BoardCardContent({
                     {childProgress!.done}/{childProgress!.total}
                   </span>
                 </div>
+              )}
+              {showUsage && (
+                <IssueUsageBadge issueId={issue.id} compact />
               )}
               {showUpdatedHint && (
                 <span className="shrink-0 text-caption text-muted-foreground">

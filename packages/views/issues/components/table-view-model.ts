@@ -121,6 +121,8 @@ function columnValue(
       return undefined;
     case "creator":
       return issue.creator_id;
+    case "usage":
+      return undefined;
   }
   return undefined;
 }

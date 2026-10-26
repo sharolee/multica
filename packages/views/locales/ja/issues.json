@@ -234,6 +234,7 @@
     "card_project": "プロジェクト",
     "card_labels": "ラベル",
     "card_child_progress": "サブタスクの進捗",
+    "card_usage": "トークン使用量",
     "show_sub_issues": "サブタスクを表示"
   },
   "view": {
@@ -304,7 +305,8 @@
       "created_at": "作成日",
       "updated_at": "更新日",
       "child_progress": "サブタスクの進捗",
-      "creator": "作成者"
+      "creator": "作成者",
+      "usage": "トークン使用量"
     },
     "calculation": {
       "label": "計算",

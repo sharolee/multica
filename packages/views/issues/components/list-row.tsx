@@ -25,6 +25,7 @@ import { LabelChip } from "../../labels/label-chip";
 import { CustomStatusChip } from "./custom-status-chip";
 import { IssueDuplicateOfMarker } from "./issue-duplicates";
 import { IssueAgentActivityIndicator } from "./issue-agent-activity-indicator";
+import { IssueUsageBadge } from "./issue-usage-badge";
 import { useIssueSurfaceSelection } from "../surface/selection-context";
 import {
   PEEKED_ROW_CLASS,
@@ -84,6 +85,7 @@ function ListRowContent({
   const showStartDate = storeProperties.startDate && issue.start_date;
   const showDueDate = storeProperties.dueDate && issue.due_date;
   const showLabels = storeProperties.labels && labels.length > 0;
+  const showUsage = storeProperties.usage;
 
   return (
     <IssueActionsContextMenu issue={issue}>
@@ -175,6 +177,7 @@ function ListRowContent({
               <span className="truncate">{project!.title}</span>
             </span>
           )}
+          {showUsage && <IssueUsageBadge issueId={issue.id} compact />}
           {showStartDate && (
             <span className="shrink-0 text-caption text-muted-foreground">
               {formatDate(issue.start_date!, locale)}

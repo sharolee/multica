@@ -54,7 +54,8 @@ export type TableSystemColumnKey =
   | "created_at"
   | "updated_at"
   | "child_progress"
-  | "creator";
+  | "creator"
+  | "usage";
 export type TableColumnKey = TableSystemColumnKey | `property:${string}`;
 export interface TableColumnConfig {
   key: TableColumnKey;
@@ -82,6 +83,7 @@ export const TABLE_SYSTEM_COLUMNS: readonly TableSystemColumnKey[] = [
   "updated_at",
   "child_progress",
   "creator",
+  "usage",
 ];
 
 export const DEFAULT_TABLE_COLUMNS: readonly TableColumnConfig[] = [
@@ -91,6 +93,7 @@ export const DEFAULT_TABLE_COLUMNS: readonly TableColumnConfig[] = [
   { key: "assignee", width: 180 },
   { key: "due_date", width: 140 },
   { key: "labels", width: 220 },
+  { key: "usage", width: 140 },
 ];
 
 export interface IssueDateFilter {
@@ -110,6 +113,7 @@ export interface CardProperties {
   project: boolean;
   childProgress: boolean;
   labels: boolean;
+  usage: boolean;
 }
 
 export interface ActorFilterValue {
@@ -179,6 +183,7 @@ export const CARD_PROPERTY_OPTIONS: { key: keyof CardProperties; label: string }
   { key: "project", label: "Project" },
   { key: "labels", label: "Labels" },
   { key: "childProgress", label: "Sub-issue progress" },
+  { key: "usage", label: "Token usage" },
 ];
 
 export const DEFAULT_CARD_PROPERTIES: Readonly<CardProperties> = {
@@ -190,6 +195,7 @@ export const DEFAULT_CARD_PROPERTIES: Readonly<CardProperties> = {
   project: true,
   childProgress: true,
   labels: false,
+  usage: false,
 };
 
 export const DEFAULT_HIDDEN_STATUSES: readonly IssueStatus[] = [

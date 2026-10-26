@@ -160,6 +160,7 @@ import {
 import type { ChildProgress } from "./list-row";
 import { ListLoadMoreFooter } from "./list-load-more-footer";
 import { IssueAgentActivityIndicator } from "./issue-agent-activity-indicator";
+import { IssueUsageBadge } from "./issue-usage-badge";
 import { IssueDuplicateOfMarker } from "./issue-duplicates";
 
 // Enough placeholder rows to cover a typical viewport; the virtualizer only
@@ -294,7 +295,8 @@ type ColumnLabelKey =
   | "created_at"
   | "updated_at"
   | "child_progress"
-  | "creator";
+  | "creator"
+  | "usage";
 
 const SORTABLE_COLUMNS: Partial<Record<TableSystemColumnKey, SortField>> = {
   title: "title",
@@ -1289,6 +1291,8 @@ function IssueTableBodyCell({
           </span>
         </span>
       );
+    case "usage":
+      return <IssueUsageBadge issueId={issue.id} />;
   }
   return null;
 }
@@ -2404,6 +2408,10 @@ export function TableView({
             }
             case "creator":
               return exportActorName(issue.creator_type, issue.creator_id);
+            case "usage":
+              // Aggregated consumption isn't a simple per-issue field; the
+              // CSV keeps the cells empty rather than pretending a number.
+              return "";
           }
           return "";
         }),

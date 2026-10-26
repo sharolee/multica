@@ -234,6 +234,7 @@
     "card_project": "프로젝트",
     "card_labels": "라벨",
     "card_child_progress": "하위 태스크 진행률",
+    "card_usage": "토큰 사용량",
     "show_sub_issues": "하위 태스크 표시"
   },
   "view": {
@@ -304,7 +305,8 @@
       "created_at": "생성일",
       "updated_at": "수정일",
       "child_progress": "하위 태스크 진행률",
-      "creator": "작성자"
+      "creator": "작성자",
+      "usage": "토큰 사용량"
     },
     "calculation": {
       "label": "계산",
