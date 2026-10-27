@@ -263,6 +263,17 @@ const (
 	// isn't installed / not on PATH.
 	ReasonAgentRuntimeMissingExecutable Reason = "agent_error.runtime_missing_executable"
 
+	// ReasonAgentRuntimeBackgroundTaskEvent: the agent runtime emitted a
+	// background-task system event during a managed run that requires
+	// foreground execution. This is a runtime discipline issue, not a
+	// provider or process failure — the agent process itself ran fine,
+	// but it let a command auto-background past the foreground timeout.
+	// Non-retryable as-is: the same long command reproduces identically.
+	// The fix is CODEBUDDY_CODE_DISABLE_BACKGROUND_TASKS=1 or
+	// CODEBUDDY_BASH_AUTO_BACKGROUND_DISABLED=1 in the runtime env
+	// (MUTCA-23).
+	ReasonAgentRuntimeBackgroundTaskEvent Reason = "agent_error.runtime_background_task_event"
+
 	// ReasonAgentUnknown: the classifier couldn't match any rule.
 	// This bucket is expected to be small (<5% of failed tasks) — a
 	// rising share is a signal that the classifier needs new rules.
@@ -313,6 +324,7 @@ var allReasons = []Reason{
 	ReasonAgentModelNotFoundOrUnavailable,
 	ReasonAgentRuntimeVersionUnsupported,
 	ReasonAgentRuntimeMissingExecutable,
+	ReasonAgentRuntimeBackgroundTaskEvent,
 
 	// Catchall.
 	ReasonAgentUnknown,

@@ -172,6 +172,9 @@ func TestClassifyRules(t *testing.T) {
 		// them only repeats the same failure.
 		{"local tool connection error is not provider network", "local tool connection error while opening its database", ReasonAgentUnknown},
 		{"mcp request timeout is not provider network", "MCP server request timed out while loading configuration", ReasonAgentUnknown},
+
+		// 0. CodeBuddy background-task system event (MUTCA-23).
+		{"background task system event", "codebuddy emitted a background task system event; Multica-managed runs require foreground execution (set CODEBUDDY_CODE_DISABLE_BACKGROUND_TASKS=1)", ReasonAgentRuntimeBackgroundTaskEvent},
 		{"local connection error with exit remains process failure", "MCP server connection error; agent exited with error: exit status 1", ReasonAgentProcessFailure},
 
 		// 15. Digit-boundary regression: 3-digit HTTP status codes must NOT

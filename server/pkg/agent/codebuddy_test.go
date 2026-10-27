@@ -681,6 +681,62 @@ func TestCodebuddyExecuteFailsOnBackgroundTaskStarted(t *testing.T) {
 	}
 }
 
+// TestCodebuddyBackgroundTaskAfterResultCompletes verifies MUTCA-23: when
+// CodeBuddy auto-backgrounds a long-running command and emits a task_started
+// system event AFTER the terminal result event has already been delivered,
+// the run should complete successfully rather than be marked failed. The
+// background-task guard only fires when no result was seen.
+func TestCodebuddyBackgroundTaskAfterResultCompletes(t *testing.T) {
+	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("shell-script fixture is POSIX-only")
+	}
+
+	// The auto-background shape: a long PowerShell command exceeds the
+	// foreground timeout, CodeBuddy auto-backgrounds it, but the agent
+	// has already produced its terminal result. The task_started event
+	// arrives after the result — the run has already delivered.
+	fakePath := filepath.Join(t.TempDir(), "codebuddy")
+	script := "#!/bin/sh\n" +
+		"IFS= read -r _\n" +
+		`printf '%s\n' '{"type":"system","subtype":"init","session_id":"sess-delivered"}'` + "\n" +
+		`printf '%s\n' '{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Done, found the timeout configs."}]}}'` + "\n" +
+		`printf '%s\n' '{"type":"result","subtype":"success","is_error":false,"session_id":"sess-delivered","result":"Done, found the timeout configs."}'` + "\n" +
+		// task_started arrives AFTER the result — the auto-background
+		// event from a command that exceeded the foreground timeout.
+		`printf '%s\n' '{"type":"system","subtype":"task_started","task_id":"pwsh-1","tool_use_id":"toolu_auto","description":"Get-ChildItem -Recurse","task_type":"PowerShell","session_id":"sess-delivered"}'` + "\n" +
+		"exit 0\n"
+	writeTestExecutable(t, fakePath, []byte(script))
+
+	b := &codebuddyBackend{cfg: Config{ExecutablePath: fakePath, Logger: slog.Default()}}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	session, err := b.Execute(ctx, "prompt", ExecOptions{Timeout: 5 * time.Second})
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	go func() {
+		for range session.Messages {
+		}
+	}()
+
+	select {
+	case result, ok := <-session.Result:
+		if !ok {
+			t.Fatal("result channel closed without a value")
+		}
+		if result.Status != "completed" {
+			t.Fatalf("expected completed when background task event arrives after result, got %q (%q)", result.Status, result.Error)
+		}
+		if result.Output != "Done, found the timeout configs." {
+			t.Fatalf("expected delivered output, got %q", result.Output)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("timeout waiting for result")
+	}
+}
+
 func TestCodebuddyExecuteFailsOnTopLevelError(t *testing.T) {
 	t.Parallel()
 	if runtime.GOOS == "windows" {

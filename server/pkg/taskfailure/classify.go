@@ -100,6 +100,17 @@ func Classify(rawError string) Reason {
 	case isUsageLimit403(lower):
 		return ReasonAgentProviderQuotaLimit
 
+	// 0. CodeBuddy background-task system event. The guard in
+	//    codebuddy.go emits a fixed message when the runtime lets a
+	//    command auto-background past its foreground timeout. Match
+	//    the specific witness so the failure_reason is distinguishable
+	//    from a generic agent_error.unknown, even though the guard now
+	//    only fires when sawResult is false (MUTCA-23). Placed before
+	//    the rules below because "background task" is a runtime
+	//    discipline issue, not a provider or process failure.
+	case strings.Contains(lower, "background task system event"):
+		return ReasonAgentRuntimeBackgroundTaskEvent
+
 	// 1. Context / token window overflow. Checked early so "token
 	//    limit" doesn't get swallowed by the broader "limit" / "quota"
 	//    rule below.
