@@ -55,6 +55,7 @@ type streamTerminalState struct {
 	lastAssistantText string
 	finalResultText   string
 	sawResult         bool
+	sawBackgroundTask  bool
 	resultIsError     bool
 	scanErr           error
 	// terminalReasonError, when non-empty, is a failure the backend read out of
@@ -146,7 +147,7 @@ func finalizeStreamResult(
 	case exitErr != nil && status == "completed":
 		status = "failed"
 		errMsg = fmt.Sprintf("%s exited with error: %v", provider, exitErr)
-	case !state.sawResult && status == "completed":
+	case !state.sawResult && !state.sawBackgroundTask && status == "completed":
 		status = "failed"
 		errMsg = provider + " stream ended without terminal result"
 	}
