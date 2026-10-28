@@ -632,7 +632,7 @@ func TestCodebuddyExecuteResumeRejectedFromStderr(t *testing.T) {
 	}
 }
 
-func TestCodebuddyExecuteFailsOnBackgroundTaskStarted(t *testing.T) {
+func TestCodebuddyBackgroundTaskDoesNotFailRun(t *testing.T) {
 	t.Parallel()
 	if runtime.GOOS == "windows" {
 		t.Skip("shell-script fixture is POSIX-only")
@@ -640,7 +640,8 @@ func TestCodebuddyExecuteFailsOnBackgroundTaskStarted(t *testing.T) {
 
 	// Replay the CodeBuddy 2.150.0 background-task shape from the headless
 	// docs: Bash tool_use → system/task_started → text tool_result → success
-	// result. Without a completion guard this used to report completed.
+	// result. A background-task event is a harness artifact and must not
+	// fail the run (MUTCA-24).
 	fakePath := filepath.Join(t.TempDir(), "codebuddy")
 	script := "#!/bin/sh\n" +
 		"IFS= read -r _\n" +
@@ -670,11 +671,8 @@ func TestCodebuddyExecuteFailsOnBackgroundTaskStarted(t *testing.T) {
 		if !ok {
 			t.Fatal("result channel closed without a value")
 		}
-		if result.Status != "failed" {
-			t.Fatalf("expected failed when system/task_started appears, got %q (%q)", result.Status, result.Error)
-		}
-		if !strings.Contains(result.Error, "background task") {
-			t.Fatalf("expected background-task error, got %q", result.Error)
+		if result.Status != "completed" {
+			t.Fatalf("expected completed when a system/task_started appears (background task is a harness artifact, not an agent failure), got %q (%q)", result.Status, result.Error)
 		}
 	case <-time.After(10 * time.Second):
 		t.Fatal("timeout waiting for result")
@@ -731,6 +729,59 @@ func TestCodebuddyBackgroundTaskAfterResultCompletes(t *testing.T) {
 		}
 		if result.Output != "Done, found the timeout configs." {
 			t.Fatalf("expected delivered output, got %q", result.Output)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("timeout waiting for result")
+	}
+}
+
+// TestCodebuddyBackgroundTaskNoResultCompletes verifies MUTCA-24: when
+// CodeBuddy auto-backgrounds a long-running command (>120s) even with
+// CODEBUDDY_BASH_AUTO_BACKGROUND_DISABLED=1 set, the turn can end without the
+// CLI ever emitting a terminal result event. The run must still complete —
+// the deliverable was produced out-of-band — instead of being marked failed
+// solely for the missing result event. This is the scenario MUTCA-23 missed
+// and is the regression test that would have caught the NAPI-12 recurrence.
+func TestCodebuddyBackgroundTaskNoResultCompletes(t *testing.T) {
+	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("shell-script fixture is POSIX-only")
+	}
+
+	// The auto-background shape: a long PowerShell command exceeds the
+	// foreground timeout, CodeBuddy auto-backgrounds it and emits a
+	// task_started system event, but no result event is ever emitted before
+	// the turn ends. The agent has already delivered its answer as assistant
+	// text.
+	fakePath := filepath.Join(t.TempDir(), "codebuddy")
+	script := "#!/bin/sh\n" +
+		"IFS= read -r _\n" +
+		`printf '%s\n' '{"type":"system","subtype":"init","session_id":"sess-bg2"}'` + "\n" +
+		`printf '%s\n' '{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Done, the timeout configs are updated."}]}}'` + "\n" +
+		`printf '%s\n' '{"type":"system","subtype":"task_started","task_id":"pwsh-1","tool_use_id":"toolu_auto","description":"Get-ChildItem -Recurse","task_type":"PowerShell","session_id":"sess-bg2"}'` + "\n" +
+		"exit 0\n"
+	writeTestExecutable(t, fakePath, []byte(script))
+
+	b := &codebuddyBackend{cfg: Config{ExecutablePath: fakePath, Logger: slog.Default()}}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	session, err := b.Execute(ctx, "prompt", ExecOptions{Timeout: 5 * time.Second})
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	go func() {
+		for range session.Messages {
+		}
+	}()
+
+	select {
+	case result, ok := <-session.Result:
+		if !ok {
+			t.Fatal("result channel closed without a value")
+		}
+		if result.Status != "completed" {
+			t.Fatalf("expected completed when a background task event arrives without a result, got %q (%q)", result.Status, result.Error)
 		}
 	case <-time.After(10 * time.Second):
 		t.Fatal("timeout waiting for result")

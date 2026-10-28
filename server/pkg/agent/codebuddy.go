@@ -326,17 +326,15 @@ func (b *codebuddyBackend) Execute(ctx context.Context, prompt string, opts Exec
 		writeErr := <-writeDone
 
 		completionGuardError := ""
-		// Only treat a background-task system event as fatal when the run
-		// never reached a terminal result. CodeBuddy's PowerShell tool can
-		// auto-background a long-running command (>120s) even with
-		// CODEBUDDY_BASH_AUTO_BACKGROUND_DISABLED=1 set, emitting a
-		// task_started/task_notification after the result event has already
-		// been delivered. In that case the run has already produced its
-		// deliverable, and marking it failed pollutes run statistics and
-		// triggers unnecessary retries (MUTCA-23).
-		if sawBackgroundTask && !sawResult {
-			completionGuardError = "codebuddy emitted a background task system event; Multica-managed runs require foreground execution (set CODEBUDDY_CODE_DISABLE_BACKGROUND_TASKS=1)"
-		}
+		// A CodeBuddy background-task system event (task_started /
+		// task_notification) is a harness artifact of auto-backgrounding a
+		// long-running command (>120s), not an agent failure. MUTCA-23
+		// stopped failing when a terminal result had been delivered;
+		// MUTCA-24 extends that to runs that end without a result event
+		// because the backgrounded command never returned one — the
+		// deliverable was still produced. Such runs complete with whatever
+		// output they have instead of being marked failed (which pollutes
+		// run statistics and triggers needless retries). See issue MUTCA-24.
 		finalStatus, finalOutput, finalError := finalizeStreamResult(
 			"codebuddy",
 			timeout,
@@ -348,6 +346,7 @@ func (b *codebuddyBackend) Execute(ctx context.Context, prompt string, opts Exec
 				lastAssistantText: lastAssistantText,
 				finalResultText:   finalResultText,
 				sawResult:         sawResult,
+				sawBackgroundTask: sawBackgroundTask,
 				resultIsError:     resultIsError,
 				scanErr:           scanErr,
 			},
